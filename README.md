@@ -1,6 +1,6 @@
 Make arguments selectable on the command line
 
-In a runnalbe script, specify
+In a script, specify e.g.
 ```python
 import argparse
 import selector
@@ -20,6 +20,6 @@ model = arguments.add_arguments(
     parser, "model", CMBClassifier
 )(activation_function=activation_function)
 ```
-making the script runnable as e.g.
+automatically making arguments selectable as e.g.
 ```sh
 python train.py --data_dir precomputed/ --split_file split.yaml --size 20 --threshold 0.2 --input_type image --activation ReLU --model_depth 8 --learning_rate 0.0003```
