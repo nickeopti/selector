@@ -2,7 +2,7 @@ Make arguments selectable on the command line.
 
 Install by
 ```sh
-pip install https://github.com/nickeopti/selector.git
+pip install git+https://github.com/nickeopti/selector.git
 ```
 
 In a script, specify e.g.
