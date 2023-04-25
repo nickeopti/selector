@@ -7,16 +7,16 @@ import selector
 
 parser = argparse.ArgumentParser()
 
-dataset_train = arguments.add_arguments(parser, "dataset", data.Box)(
+dataset_train = selector.add_arguments(parser, "dataset", data.Box)(
     split_partition="train"
 )
-dataset_val = arguments.add_arguments(parser, "dataset", data.Box)(
+dataset_val = selector.add_arguments(parser, "dataset", data.Box)(
     split_partition="val"
 )
-activation_function = arguments.add_options_from_module(
+activation_function = selector.add_options_from_module(
     parser, "activation", torch.nn.modules.activation, torch.nn.Module
 )
-model = arguments.add_arguments(
+model = selector.add_arguments(
     parser, "model", CMBClassifier
 )(activation_function=activation_function)
 ```
