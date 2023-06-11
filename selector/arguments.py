@@ -85,15 +85,20 @@ def add_options_from_module(
 def _get_arguments(
     from_object: Type[object], excluded_parameters=("self", "cls", "device")
 ):
-    signature = inspect.signature(from_object.__init__)
-    parameters = {
-        k: p
-        for k, p in signature.parameters.items()
-        if p.kind == p.POSITIONAL_OR_KEYWORD
-    }
+    all_parameters = {}
+
+    for base in from_object.__mro__:
+        signature = inspect.signature(base.__init__)
+        parameters = {
+            k: p
+            for k, p in signature.parameters.items()
+            if p.kind == p.POSITIONAL_OR_KEYWORD
+        }
+        all_parameters.update(parameters)
+
     return [
         parameter
-        for parameter in parameters.values()
+        for parameter in all_parameters.values()
         if parameter.name not in excluded_parameters
     ]
 
