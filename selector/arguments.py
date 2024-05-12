@@ -8,6 +8,21 @@ from typing import Sequence, Type, TypeVar, Union
 T = TypeVar("T")
 
 
+def to_bool(val: str):
+    match val.lower():
+        case 'true':
+            return True
+        case 'false':
+            return False
+        case _:
+            raise ValueError()
+
+
+CONVERTER = {
+    bool: to_bool,
+}
+
+
 def get_argument(argument_parser: ArgumentParser, name: str, type: Type[T], default: T = None) -> T:
     argument_parser.add_argument(f'--{name}', type=type, default=default)
     args, _ = argument_parser.parse_known_args()
@@ -37,7 +52,7 @@ def add_arguments(
                 raise ValueError(f'Type hint for {argument.name!r} seems to be missing')
             argument_group.add_argument(
                 f"--{argument.name}",
-                type=typing.get_args(argument.annotation)[0],
+                type=CONVERTER.get(type_hint, type_hint),
             )
         else:
             type_hint = argument.annotation
@@ -45,7 +60,7 @@ def add_arguments(
                 raise ValueError(f'Type hint for {argument.name!r} seems to be missing')
             argument_group.add_argument(
                 f"--{argument.name}",
-                type=argument.annotation,
+                type=CONVERTER.get(type_hint, type_hint),
             )
 
     temp_args, _ = argument_parser.parse_known_args()
