@@ -32,11 +32,17 @@ def add_arguments(
             continue
 
         if is_optional(argument.annotation):
+            type_hint = typing.get_args(argument.annotation)[0]
+            if type_hint is inspect._empty:
+                raise ValueError(f'Type hint for {argument.name!r} seems to be missing')
             argument_group.add_argument(
                 f"--{argument.name}",
                 type=typing.get_args(argument.annotation)[0],
             )
         else:
+            type_hint = argument.annotation
+            if type_hint is inspect._empty:
+                raise ValueError(f'Type hint for {argument.name!r} seems to be missing')
             argument_group.add_argument(
                 f"--{argument.name}",
                 type=argument.annotation,
