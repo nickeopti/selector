@@ -72,9 +72,10 @@ def add_options(
 
     selected_class_name = vars(temp_args)[name]
 
-    selected_class = {c.__name__: c for c in options if c is not None}[
-        selected_class_name
-    ]
+    selectable_classes = {c.__name__: c for c in options if c is not None}
+    if selected_class_name not in selectable_classes:
+        raise ValueError(f'Specified class name {selected_class_name!r} is not selectable (check for typos)')
+    selected_class = selectable_classes[selected_class_name]
 
     return add_arguments(argument_parser, selected_class_name, selected_class)
 
