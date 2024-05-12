@@ -107,7 +107,7 @@ def _get_arguments(
             for k, p in signature.parameters.items()
             if p.kind == p.POSITIONAL_OR_KEYWORD
         }
-        all_parameters.update(parameters)
+        all_parameters = parameters | all_parameters  # Let subclass parameters take precedence
 
     return [
         parameter
