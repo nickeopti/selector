@@ -1,5 +1,6 @@
 import inspect
 import typing
+import warnings
 from argparse import ArgumentParser, _StoreAction
 from functools import partial
 from types import ModuleType
@@ -49,7 +50,7 @@ def add_arguments(
         if is_optional(argument.annotation):
             type_hint = typing.get_args(argument.annotation)[0]
             if type_hint is inspect._empty:
-                raise ValueError(f'Type hint for {argument.name!r} seems to be missing')
+                warnings.warn(f'Type hint for {argument.name!r} seems to be missing')
             argument_group.add_argument(
                 f"--{argument.name}",
                 type=CONVERTER.get(type_hint, type_hint),
@@ -57,7 +58,7 @@ def add_arguments(
         else:
             type_hint = argument.annotation
             if type_hint is inspect._empty:
-                raise ValueError(f'Type hint for {argument.name!r} seems to be missing')
+                warnings.warn(f'Type hint for {argument.name!r} seems to be missing')
             argument_group.add_argument(
                 f"--{argument.name}",
                 type=CONVERTER.get(type_hint, type_hint),
