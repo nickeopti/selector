@@ -6,7 +6,7 @@ from functools import partial
 from types import ModuleType
 from typing import Callable, Sequence, Type, TypeVar, Union
 
-T = TypeVar("T")
+T = TypeVar('T')
 
 
 def to_bool(val: str):
@@ -38,11 +38,11 @@ def add_arguments(
     argument_group = argument_parser.add_argument_group(name)
 
     previously_known_arguments = [
-        argument.option_strings[0][2:]
-        for argument in argument_parser._actions
-        if isinstance(argument, _StoreAction)
+        argument.option_strings[0][2:] for argument in argument_parser._actions if isinstance(argument, _StoreAction)
     ]
-    arguments = _get_arguments(reference) if isinstance(reference, type) else _get_function_arguments(reference).values()
+    arguments = (
+        _get_arguments(reference) if isinstance(reference, type) else _get_function_arguments(reference).values()
+    )
     for argument in arguments:
         if argument.name in previously_known_arguments:
             continue
@@ -52,7 +52,7 @@ def add_arguments(
             if type_hint is inspect._empty:
                 warnings.warn(f'Type hint for {argument.name!r} seems to be missing')
             argument_group.add_argument(
-                f"--{argument.name}",
+                f'--{argument.name}',
                 type=CONVERTER.get(type_hint, type_hint),
             )
         else:
@@ -60,7 +60,7 @@ def add_arguments(
             if type_hint is inspect._empty:
                 warnings.warn(f'Type hint for {argument.name!r} seems to be missing')
             argument_group.add_argument(
-                f"--{argument.name}",
+                f'--{argument.name}',
                 type=CONVERTER.get(type_hint, type_hint),
             )
 
@@ -80,7 +80,7 @@ def add_options(
     argument_group = argument_parser.add_argument_group(name)
 
     argument_group.add_argument(
-        f"--{name}",
+        f'--{name}',
         type=str,
         default=options[0].__name__ if options[0] is not None else None,
     )
@@ -116,33 +116,20 @@ def add_options_from_module(
 def _get_function_arguments(function: Callable):
     signature = inspect.signature(function)
 
-    parameters = {
-        k: p
-        for k, p in signature.parameters.items()
-        if p.kind == p.POSITIONAL_OR_KEYWORD
-    }
+    parameters = {k: p for k, p in signature.parameters.items() if p.kind == p.POSITIONAL_OR_KEYWORD}
 
     return parameters
 
 
-def _get_arguments(
-    from_object: Type[object], excluded_parameters=("self", "cls", "device")
-):
+def _get_arguments(from_object: Type[object], excluded_parameters=('self', 'cls', 'device')):
     all_parameters: dict[str, inspect.Parameter] = {}
 
     for base in from_object.__mro__:
         parameters = _get_function_arguments(base.__init__)  # type: ignore
         all_parameters = parameters | all_parameters  # Let subclass parameters take precedence
 
-    return [
-        parameter
-        for parameter in all_parameters.values()
-        if parameter.name not in excluded_parameters
-    ]
+    return [parameter for parameter in all_parameters.values() if parameter.name not in excluded_parameters]
 
 
 def is_optional(annotation):
-    return (
-        typing.get_origin(annotation) is Union
-        and None.__class__ in typing.get_args(annotation)
-    )
+    return typing.get_origin(annotation) is Union and None.__class__ in typing.get_args(annotation)
