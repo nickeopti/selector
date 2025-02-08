@@ -4,11 +4,26 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "selector"
-version = "0.0.1"
-requires-python = ">=3.8"
+version = "0.2.0"
+requires-python = ">=3.10"
 dependencies = [
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy",
+    "ruff",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
 namespaces = false
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.format]
+quote-style = "single"
