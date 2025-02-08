@@ -3,7 +3,7 @@ import typing
 from argparse import ArgumentParser, _StoreAction
 from functools import partial
 from types import ModuleType
-from typing import Sequence, Type, TypeVar, Union
+from typing import Callable, Sequence, Type, TypeVar, Union
 
 T = TypeVar("T")
 
@@ -23,14 +23,14 @@ CONVERTER = {
 }
 
 
-def get_argument(argument_parser: ArgumentParser, name: str, type: Type[T], default: T = None) -> T:
+def get_argument(argument_parser: ArgumentParser, name: str, type: Type[T], default: T | None = None) -> T:
     argument_parser.add_argument(f'--{name}', type=type, default=default)
     args, _ = argument_parser.parse_known_args()
     return getattr(args, name)
 
 
 def add_arguments(
-    argument_parser: ArgumentParser, name: str, class_ref: Type[T]
+    argument_parser: ArgumentParser, name: str, reference: Type[T] | Callable, *, args: Sequence[str] | None = None
 ) -> partial[T]:
     # TODO: Arguments not specified should be excluded, not set to None
 
@@ -41,7 +41,7 @@ def add_arguments(
         for argument in argument_parser._actions
         if isinstance(argument, _StoreAction)
     ]
-    arguments = _get_arguments(class_ref)
+    arguments = _get_arguments(reference) if isinstance(reference, type) else _get_function_arguments(reference).values()
     for argument in arguments:
         if argument.name in previously_known_arguments:
             continue
@@ -63,18 +63,18 @@ def add_arguments(
                 type=CONVERTER.get(type_hint, type_hint),
             )
 
-    temp_args, _ = argument_parser.parse_known_args()
+    temp_args, _ = argument_parser.parse_known_args(args)
     argument_values = {
         argument.name: vars(temp_args)[argument.name]
         for argument in arguments
         if vars(temp_args)[argument.name] is not None
     }
 
-    return partial(class_ref, **argument_values)
+    return partial(reference, **argument_values)
 
 
 def add_options(
-    argument_parser: ArgumentParser, name: str, options: Sequence[Type[T]]
+    argument_parser: ArgumentParser, name: str, options: Sequence[Type[T]], *, args: Sequence[str] | None = None
 ) -> partial[T]:
     argument_group = argument_parser.add_argument_group(name)
 
@@ -83,7 +83,7 @@ def add_options(
         type=str,
         default=options[0].__name__ if options[0] is not None else None,
     )
-    temp_args, _ = argument_parser.parse_known_args()
+    temp_args, _ = argument_parser.parse_known_args(args)
 
     selected_class_name = vars(temp_args)[name]
 
@@ -92,7 +92,7 @@ def add_options(
         raise ValueError(f'Specified class name {selected_class_name!r} is not selectable (check for typos)')
     selected_class = selectable_classes[selected_class_name]
 
-    return add_arguments(argument_parser, selected_class_name, selected_class)
+    return add_arguments(argument_parser, selected_class_name, selected_class, args=args)
 
 
 def add_options_from_module(
@@ -100,6 +100,8 @@ def add_options_from_module(
     name: str,
     module: ModuleType,
     of_subclass: Type[T],
+    *,
+    args: Sequence[str] | None = None,
 ) -> partial[T]:
     def predicate(obj):
         return inspect.isclass(obj) and issubclass(obj, of_subclass)
@@ -107,21 +109,28 @@ def add_options_from_module(
     valid_classes = inspect.getmembers(module, predicate)
     options = [valid_class for _, valid_class in valid_classes]
 
-    return add_options(argument_parser, name, options)
+    return add_options(argument_parser, name, options, args=args)
+
+
+def _get_function_arguments(function: Callable):
+    signature = inspect.signature(function)
+
+    parameters = {
+        k: p
+        for k, p in signature.parameters.items()
+        if p.kind == p.POSITIONAL_OR_KEYWORD
+    }
+
+    return parameters
 
 
 def _get_arguments(
     from_object: Type[object], excluded_parameters=("self", "cls", "device")
 ):
-    all_parameters = {}
+    all_parameters: dict[str, inspect.Parameter] = {}
 
     for base in from_object.__mro__:
-        signature = inspect.signature(base.__init__)
-        parameters = {
-            k: p
-            for k, p in signature.parameters.items()
-            if p.kind == p.POSITIONAL_OR_KEYWORD
-        }
+        parameters = _get_function_arguments(base.__init__)  # type: ignore
         all_parameters = parameters | all_parameters  # Let subclass parameters take precedence
 
     return [
