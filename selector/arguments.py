@@ -24,9 +24,16 @@ CONVERTER = {
 }
 
 
-def get_argument(argument_parser: ArgumentParser, name: str, type: Type[T], default: T | None = None) -> T:
+def get_argument(
+    argument_parser: ArgumentParser,
+    name: str,
+    type: Type[T],
+    default: T | None = None,
+    *,
+    args: Sequence[str] | None = None,
+) -> T:
     argument_parser.add_argument(f'--{name}', type=CONVERTER.get(type, type), default=default)
-    args, _ = argument_parser.parse_known_args()
+    args, _ = argument_parser.parse_known_args(args)
     return getattr(args, name)
 
 
