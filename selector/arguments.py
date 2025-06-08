@@ -58,17 +58,33 @@ def add_arguments(
             type_hint = typing.get_args(argument.annotation)[0]
             if type_hint is inspect._empty:
                 warnings.warn(f'Type hint for {argument.name!r} seems to be missing')
+
+            is_list = hasattr(type_hint, '__origin__') and type_hint.__origin__ is list
+            if is_list:
+                if not hasattr(type_hint, '__args__') or type_hint.__args__[0] is inspect._empty:
+                    warnings.warn(f'Type hint for {argument.name!r} missing type hint for list items')
+                type_hint = type_hint.__args__[0]
+
             argument_group.add_argument(
                 f'--{argument.name}',
                 type=CONVERTER.get(type_hint, type_hint),
+                action='append' if is_list else None,
             )
         else:
             type_hint = argument.annotation
             if type_hint is inspect._empty:
                 warnings.warn(f'Type hint for {argument.name!r} seems to be missing')
+
+            is_list = hasattr(type_hint, '__origin__') and type_hint.__origin__ is list
+            if is_list:
+                if not hasattr(type_hint, '__args__') or type_hint.__args__[0] is inspect._empty:
+                    warnings.warn(f'Type hint for {argument.name!r} missing type hint for list items')
+                type_hint = type_hint.__args__[0]
+
             argument_group.add_argument(
                 f'--{argument.name}',
                 type=CONVERTER.get(type_hint, type_hint),
+                action='append' if is_list else None,
             )
 
     temp_args, _ = argument_parser.parse_known_args(args)
