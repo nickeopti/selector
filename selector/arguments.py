@@ -32,7 +32,9 @@ def get_argument(
     *,
     args: Sequence[str] | None = None,
 ) -> T:
-    argument_parser.add_argument(f'--{name}', type=CONVERTER.get(type, type), default=default)
+    if name not in _previously_known_arguments(argument_parser):
+        argument_parser.add_argument(f'--{name}', type=CONVERTER.get(type, type), default=default)
+
     args, _ = argument_parser.parse_known_args(args)
     return getattr(args, name)
 
@@ -44,9 +46,7 @@ def add_arguments(
 
     argument_group = argument_parser.add_argument_group(name)
 
-    previously_known_arguments = [
-        argument.option_strings[0][2:] for argument in argument_parser._actions if isinstance(argument, _StoreAction)
-    ]
+    previously_known_arguments = _previously_known_arguments(argument_parser)
     arguments = (
         _get_arguments(reference) if isinstance(reference, type) else _get_function_arguments(reference).values()
     )
@@ -148,6 +148,12 @@ def _get_arguments(from_object: Type[object], excluded_parameters=('self', 'cls'
         all_parameters = parameters | all_parameters  # Let subclass parameters take precedence
 
     return [parameter for parameter in all_parameters.values() if parameter.name not in excluded_parameters]
+
+
+def _previously_known_arguments(argument_parser: ArgumentParser) -> list[str]:
+    return [
+        argument.option_strings[0][2:] for argument in argument_parser._actions if isinstance(argument, _StoreAction)
+    ]
 
 
 def is_optional(annotation):
