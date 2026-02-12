@@ -54,10 +54,17 @@ def add_arguments(
         if argument.name in previously_known_arguments:
             continue
 
-        if is_optional(argument.annotation):
-            type_hint = typing.get_args(argument.annotation)[0]
-        else:
-            type_hint = argument.annotation
+        type_hint = argument.annotation
+
+        if isinstance(type_hint, str):
+            try:
+                type_hint = eval(type_hint)
+            except Exception:
+                warnings.warn(f'Type hint for {argument.name!r} is not supported by selector, got {type_hint!r}, skipping')
+                continue
+
+        if is_optional(type_hint):
+            type_hint = typing.get_args(type_hint)[0]
 
         if type_hint is inspect._empty:
             warnings.warn(f'Type hint for {argument.name!r} seems to be missing')
@@ -78,7 +85,7 @@ def add_arguments(
     argument_values = {
         argument.name: vars(temp_args)[argument.name]
         for argument in arguments
-        if vars(temp_args)[argument.name] is not None
+        if argument.name in vars(temp_args) and vars(temp_args)[argument.name] is not None
     }
 
     return partial(reference, **argument_values)
