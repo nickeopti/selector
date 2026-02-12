@@ -6,22 +6,9 @@ from functools import partial
 from types import ModuleType, UnionType
 from typing import Callable, Sequence, Type, TypeVar, Union
 
+from selector.converters import converter
+
 T = TypeVar('T')
-
-
-def to_bool(val: str):
-    match val.lower():
-        case 'true':
-            return True
-        case 'false':
-            return False
-        case _:
-            raise ValueError()
-
-
-CONVERTER = {
-    bool: to_bool,
-}
 
 
 def get_argument(
@@ -33,7 +20,7 @@ def get_argument(
     args: Sequence[str] | None = None,
 ) -> T:
     if name not in _previously_known_arguments(argument_parser):
-        argument_parser.add_argument(f'--{name}', type=CONVERTER.get(type, type), default=default)
+        argument_parser.add_argument(f'--{name}', type=converter.get(type), default=default)
 
     args, _ = argument_parser.parse_known_args(args)
     return getattr(args, name)
@@ -79,7 +66,7 @@ def add_arguments(
 
         argument_group.add_argument(
             f'--{argument.name}',
-            type=CONVERTER.get(type_hint, type_hint),
+            type=converter.get(type_hint),
             action='append' if is_list else None,
         )
 
