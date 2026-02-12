@@ -3,7 +3,7 @@ import typing
 import warnings
 from argparse import ArgumentParser, _StoreAction
 from functools import partial
-from types import ModuleType
+from types import ModuleType, UnionType
 from typing import Callable, Sequence, Type, TypeVar, Union
 
 T = TypeVar('T')
@@ -64,7 +64,9 @@ def add_arguments(
                 continue
 
         if is_optional(type_hint):
-            type_hint = typing.get_args(type_hint)[0]
+            types = typing.get_args(type_hint)
+            i = types.index(None.__class__)
+            type_hint = types[(i + 1) % 2]
 
         if type_hint is inspect._empty:
             warnings.warn(f'Type hint for {argument.name!r} seems to be missing')
@@ -149,4 +151,12 @@ def _get_arguments(from_object: Type[object], excluded_parameters=('self', 'cls'
 
 
 def is_optional(annotation):
-    return typing.get_origin(annotation) is Union and None.__class__ in typing.get_args(annotation)
+    if not typing.get_origin(annotation) in (Union, UnionType):
+        return False
+
+    types = typing.get_args(annotation)
+
+    if None.__class__ not in types:
+        return False
+
+    return len(types) == 2
