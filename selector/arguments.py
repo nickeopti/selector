@@ -22,8 +22,8 @@ def get_argument(
     if name not in _previously_known_arguments(argument_parser):
         argument_parser.add_argument(f'--{name}', type=converter.get(type), default=default)
 
-    args, _ = argument_parser.parse_known_args(args)
-    return getattr(args, name)
+    parsed_args, _ = argument_parser.parse_known_args(args)
+    return getattr(parsed_args, name)
 
 
 def add_arguments(
