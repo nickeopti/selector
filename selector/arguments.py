@@ -90,6 +90,7 @@ def add_options(
         f'--{name}',
         type=str,
         default=options[0].__name__ if options[0] is not None else None,
+        required=True,
     )
     temp_args, _ = argument_parser.parse_known_args(args)
 
