@@ -7,19 +7,26 @@ from types import ModuleType, UnionType
 from typing import Any, Callable, Sequence, Type, TypeVar, Union
 
 from selector.converters import converter
+from selector.parser import parser as default_parser
 from selector.postprocessors import postprocessor
 
 T = TypeVar('T')
 
 
+def _resolve_parser(parser: ArgumentParser | None) -> ArgumentParser:
+    return parser or default_parser.get()
+
+
 def get_argument(
-    argument_parser: ArgumentParser,
     name: str,
     type: Type[T],
     default: T | None = None,
     *,
+    parser: ArgumentParser | None = None,
     args: Sequence[str] | None = None,
 ) -> T:
+    argument_parser = _resolve_parser(parser)
+
     if name not in _previously_known_arguments(argument_parser):
         argument_parser.add_argument(f'--{name}', type=converter.get(type), default=default)
 
@@ -28,10 +35,15 @@ def get_argument(
 
 
 def add_arguments(
-    argument_parser: ArgumentParser, name: str, reference: Type[T] | Callable, *, args: Sequence[str] | None = None
+    name: str,
+    reference: Type[T] | Callable,
+    *,
+    parser: ArgumentParser | None = None,
+    args: Sequence[str] | None = None,
 ) -> partial[T]:
     # TODO: Arguments not specified should be excluded, not set to None
 
+    argument_parser = _resolve_parser(parser)
     argument_group = argument_parser.add_argument_group(name)
 
     argument_postprocessors: dict[str, Callable[[Any], Any]] = {}
@@ -89,8 +101,13 @@ def add_arguments(
 
 
 def add_options(
-    argument_parser: ArgumentParser, name: str, options: Sequence[Type[T]], *, args: Sequence[str] | None = None
+    name: str,
+    options: Sequence[Type[T]],
+    *,
+    parser: ArgumentParser | None = None,
+    args: Sequence[str] | None = None,
 ) -> partial[T]:
+    argument_parser = _resolve_parser(parser)
     argument_group = argument_parser.add_argument_group(name)
 
     argument_group.add_argument(
@@ -108,17 +125,19 @@ def add_options(
         raise ValueError(f'Specified class name {selected_class_name!r} is not selectable (check for typos)')
     selected_class = selectable_classes[selected_class_name]
 
-    return add_arguments(argument_parser, selected_class_name, selected_class, args=args)
+    return add_arguments(selected_class_name, selected_class, parser=argument_parser, args=args)
 
 
 def add_options_from_module(
-    argument_parser: ArgumentParser,
     name: str,
     module: ModuleType,
     of_subclass: Type[T],
     *,
+    parser: ArgumentParser | None = None,
     args: Sequence[str] | None = None,
 ) -> partial[T]:
+    argument_parser = _resolve_parser(parser)
+
     origin = typing.get_origin(of_subclass)
     proper_class_type = origin if origin is not None else of_subclass
 
@@ -128,7 +147,7 @@ def add_options_from_module(
     valid_classes = inspect.getmembers(module, predicate)
     options = [valid_class for _, valid_class in valid_classes]
 
-    return add_options(argument_parser, name, options, args=args)
+    return add_options(name, options, parser=argument_parser, args=args)
 
 
 def _get_function_arguments(function: Callable):

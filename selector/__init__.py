@@ -6,3 +6,5 @@ from selector.arguments import (
 )  # noqa: F401
 
 from selector.converters import converter  # noqa: F401
+from selector.parser import parser  # noqa: F401
+from selector.postprocessors import postprocessor  # noqa: F401

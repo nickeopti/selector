@@ -15,15 +15,15 @@ def test_add_options_generics():
     class C(A[T]): ...
 
     parser = ArgumentParser()
-    v = selector.add_options(parser, 'v', [A, B, C], args=('--v', 'A'))()
+    v = selector.add_options('v', [A, B, C], parser=parser, args=('--v', 'A'))()
     assert isinstance(v, A)
 
     parser = ArgumentParser()
-    v = selector.add_options(parser, 'v', [A, B, C], args=('--v', 'B'))()
+    v = selector.add_options('v', [A, B, C], parser=parser, args=('--v', 'B'))()
     assert isinstance(v, B)
 
     parser = ArgumentParser()
-    v = selector.add_options(parser, 'v', [A, B, C], args=('--v', 'C'))()
+    v = selector.add_options('v', [A, B, C], parser=parser, args=('--v', 'C'))()
     assert isinstance(v, C)
 
 
@@ -41,13 +41,13 @@ def test_add_options_from_module_generics():
     setattr(test_module, 'C', C)
 
     parser = ArgumentParser()
-    v = selector.add_options_from_module(parser, 'v', test_module, A[int], args=('--v', 'A'))()
+    v = selector.add_options_from_module('v', test_module, A[int], parser=parser, args=('--v', 'A'))()
     assert isinstance(v, A)
 
     parser = ArgumentParser()
-    v = selector.add_options_from_module(parser, 'v', test_module, A[int], args=('--v', 'B'))()
+    v = selector.add_options_from_module('v', test_module, A[int], parser=parser, args=('--v', 'B'))()
     assert isinstance(v, B)
 
     parser = ArgumentParser()
-    v = selector.add_options_from_module(parser, 'v', test_module, A[int], args=('--v', 'C'))()
+    v = selector.add_options_from_module('v', test_module, A[int], parser=parser, args=('--v', 'C'))()
     assert isinstance(v, C)
