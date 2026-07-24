@@ -68,7 +68,7 @@ def add_arguments(
         argument_group.add_argument(
             f'--{argument.name}',
             type=converter.get(type_hint),
-            action='append' if is_list else None,
+            action='append' if is_list else 'store',
         )
 
     temp_args, _ = argument_parser.parse_known_args(args)
