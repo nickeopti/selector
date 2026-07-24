@@ -4,9 +4,10 @@ import warnings
 from argparse import ArgumentParser, _StoreAction
 from functools import partial
 from types import ModuleType, UnionType
-from typing import Callable, Sequence, Type, TypeVar, Union
+from typing import Any, Callable, Sequence, Type, TypeVar, Union
 
 from selector.converters import converter
+from selector.postprocessors import postprocessor
 
 T = TypeVar('T')
 
@@ -33,14 +34,13 @@ def add_arguments(
 
     argument_group = argument_parser.add_argument_group(name)
 
+    argument_postprocessors: dict[str, Callable[[Any], Any]] = {}
+
     previously_known_arguments = _previously_known_arguments(argument_parser)
     arguments = (
         _get_arguments(reference) if isinstance(reference, type) else _get_function_arguments(reference).values()
     )
     for argument in arguments:
-        if argument.name in previously_known_arguments:
-            continue
-
         type_hint = argument.annotation
 
         if isinstance(type_hint, str):
@@ -59,23 +59,28 @@ def add_arguments(
             warnings.warn(f'Type hint for {argument.name!r} seems to be missing, skipping')
             continue
 
-        is_list = typing.get_origin(type_hint) is list
-        if is_list:
+        origin = typing.get_origin(type_hint)
+        is_append_container = origin in (list, tuple, set)
+        if is_append_container:
             item_types = typing.get_args(type_hint)
             if not item_types or item_types[0] is inspect._empty:
-                warnings.warn(f'Type hint for {argument.name!r} missing type hint for list items, skipping')
+                warnings.warn(f'Type hint for {argument.name!r} missing type hint for collection items, skipping')
                 continue
             type_hint = item_types[0]
+        argument_postprocessors[argument.name] = postprocessor.get(origin)
+
+        if argument.name in previously_known_arguments:
+            continue
 
         argument_group.add_argument(
             f'--{argument.name}',
             type=converter.get(type_hint),
-            action='append' if is_list else 'store',
+            action='append' if is_append_container else 'store',
         )
 
     temp_args, _ = argument_parser.parse_known_args(args)
     argument_values = {
-        argument.name: vars(temp_args)[argument.name]
+        argument.name: argument_postprocessors[argument.name](vars(temp_args)[argument.name])
         for argument in arguments
         if argument.name in vars(temp_args) and vars(temp_args)[argument.name] is not None
     }
