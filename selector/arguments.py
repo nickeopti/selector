@@ -59,11 +59,13 @@ def add_arguments(
             warnings.warn(f'Type hint for {argument.name!r} seems to be missing, skipping')
             continue
 
-        is_list = hasattr(type_hint, '__origin__') and type_hint.__origin__ is list
+        is_list = typing.get_origin(type_hint) is list
         if is_list:
-            if not hasattr(type_hint, '__args__') or type_hint.__args__[0] is inspect._empty:
-                warnings.warn(f'Type hint for {argument.name!r} missing type hint for list items')
-            type_hint = type_hint.__args__[0]
+            item_types = typing.get_args(type_hint)
+            if not item_types or item_types[0] is inspect._empty:
+                warnings.warn(f'Type hint for {argument.name!r} missing type hint for list items, skipping')
+                continue
+            type_hint = item_types[0]
 
         argument_group.add_argument(
             f'--{argument.name}',
