@@ -56,7 +56,8 @@ def add_arguments(
             type_hint = types[(i + 1) % 2]
 
         if type_hint is inspect._empty:
-            warnings.warn(f'Type hint for {argument.name!r} seems to be missing')
+            warnings.warn(f'Type hint for {argument.name!r} seems to be missing, skipping')
+            continue
 
         is_list = hasattr(type_hint, '__origin__') and type_hint.__origin__ is list
         if is_list:
