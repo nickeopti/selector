@@ -112,8 +112,11 @@ def add_options_from_module(
     *,
     args: Sequence[str] | None = None,
 ) -> partial[T]:
+    origin = typing.get_origin(of_subclass)
+    proper_class_type = origin if origin is not None else of_subclass
+
     def predicate(obj):
-        return inspect.isclass(obj) and issubclass(obj, of_subclass)
+        return inspect.isclass(obj) and issubclass(obj, proper_class_type)
 
     valid_classes = inspect.getmembers(module, predicate)
     options = [valid_class for _, valid_class in valid_classes]
