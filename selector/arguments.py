@@ -158,12 +158,20 @@ def _get_function_arguments(function: Callable[..., Any]) -> dict[str, inspect.P
     return parameters
 
 
-def _get_arguments(from_object: Type[object], excluded_parameters: Sequence[str] = ('self', 'cls', 'device')):
+def _takes_kwargs(function: Callable[..., Any]) -> bool:
+    signature = inspect.signature(function)
+    return any(p.kind == p.VAR_KEYWORD for p in signature.parameters.values())
+
+
+def _get_arguments(from_object: Type[object], excluded_parameters: Sequence[str] = ('self', 'cls', 'device')) -> list[inspect.Parameter]:
     all_parameters: dict[str, inspect.Parameter] = {}
 
     for base in from_object.__mro__:
         parameters = _get_function_arguments(base.__init__)  # type: ignore
         all_parameters = parameters | all_parameters  # Let subclass parameters take precedence
+
+        if not _takes_kwargs(base.__init__):
+            break
 
     return [parameter for parameter in all_parameters.values() if parameter.name not in excluded_parameters]
 
