@@ -4,7 +4,7 @@ import selector
 
 
 @pytest.mark.parametrize("value", ["true", "True", "TRUE", "false", "False", "FALSE"])
-def test_bool_converter(value):
+def test_bool_converter(value: str):
     def f(value: bool):
         return value
 

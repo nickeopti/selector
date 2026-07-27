@@ -7,7 +7,7 @@ class Parser:
 
     def get(self) -> ArgumentParser:
         if self._parser is None:
-            self._parser = ArgumentParser()
+            self._parser = ArgumentParser(allow_abbrev=False, add_help=False)
         return self._parser
 
     def set(self, parser: ArgumentParser) -> None:

@@ -15,15 +15,15 @@ def test_add_options_generics():
     class C(A[T]): ...
 
     parser = ArgumentParser()
-    v = selector.add_options('v', [A, B, C], parser=parser, args=('--v', 'A'))()
+    v = selector.add_options('v', [A[int], B[int], C[int]], parser=parser, args=('--v', 'A'))()
     assert isinstance(v, A)
 
     parser = ArgumentParser()
-    v = selector.add_options('v', [A, B, C], parser=parser, args=('--v', 'B'))()
+    v = selector.add_options('v', [A[int], B[int], C[int]], parser=parser, args=('--v', 'B'))()
     assert isinstance(v, B)
 
     parser = ArgumentParser()
-    v = selector.add_options('v', [A, B, C], parser=parser, args=('--v', 'C'))()
+    v = selector.add_options('v', [A[int], B[int], C[int]], parser=parser, args=('--v', 'C'))()
     assert isinstance(v, C)
 
 

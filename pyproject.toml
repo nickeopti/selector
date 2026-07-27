@@ -28,3 +28,6 @@ select = ["E", "F", "I"]
 
 [tool.ruff.format]
 quote-style = "single"
+
+[tool.pyright]
+typeCheckingMode = "strict"

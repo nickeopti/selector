@@ -1,7 +1,7 @@
 import inspect
 import typing
 import warnings
-from argparse import ArgumentParser, _StoreAction
+from argparse import ArgumentParser
 from functools import partial
 from types import ModuleType, UnionType
 from typing import Any, Callable, Sequence, Type, TypeVar, Union
@@ -36,7 +36,7 @@ def get_argument(
 
 def add_arguments(
     name: str,
-    reference: Type[T] | Callable,
+    reference: Type[T] | Callable[..., T],
     *,
     parser: ArgumentParser | None = None,
     args: Sequence[str] | None = None,
@@ -67,7 +67,7 @@ def add_arguments(
             i = types.index(None.__class__)
             type_hint = types[(i + 1) % 2]
 
-        if type_hint is inspect._empty:
+        if type_hint is inspect.Parameter.empty:
             warnings.warn(f'Type hint for {argument.name!r} seems to be missing, skipping')
             continue
 
@@ -75,7 +75,7 @@ def add_arguments(
         is_append_container = origin in (list, tuple, set)
         if is_append_container:
             item_types = typing.get_args(type_hint)
-            if not item_types or item_types[0] is inspect._empty:
+            if not item_types or item_types[0] is inspect.Parameter.empty:
                 warnings.warn(f'Type hint for {argument.name!r} missing type hint for collection items, skipping')
                 continue
             type_hint = item_types[0]
@@ -113,14 +113,14 @@ def add_options(
     argument_group.add_argument(
         f'--{name}',
         type=str,
-        default=options[0].__name__ if options[0] is not None else None,
+        default=options[0].__name__,
         required=True,
     )
     temp_args, _ = argument_parser.parse_known_args(args)
 
     selected_class_name = vars(temp_args)[name]
 
-    selectable_classes = {c.__name__: c for c in options if c is not None}
+    selectable_classes = {c.__name__: c for c in options}
     if selected_class_name not in selectable_classes:
         raise ValueError(f'Specified class name {selected_class_name!r} is not selectable (check for typos)')
     selected_class = selectable_classes[selected_class_name]
@@ -141,7 +141,7 @@ def add_options_from_module(
     origin = typing.get_origin(of_subclass)
     proper_class_type = origin if origin is not None else of_subclass
 
-    def predicate(obj):
+    def predicate(obj: object) -> bool:
         return inspect.isclass(obj) and issubclass(obj, proper_class_type)
 
     valid_classes = inspect.getmembers(module, predicate)
@@ -150,7 +150,7 @@ def add_options_from_module(
     return add_options(name, options, parser=argument_parser, args=args)
 
 
-def _get_function_arguments(function: Callable):
+def _get_function_arguments(function: Callable[..., Any]) -> dict[str, inspect.Parameter]:
     signature = inspect.signature(function)
 
     parameters = {k: p for k, p in signature.parameters.items() if p.kind == p.POSITIONAL_OR_KEYWORD}
@@ -158,7 +158,7 @@ def _get_function_arguments(function: Callable):
     return parameters
 
 
-def _get_arguments(from_object: Type[object], excluded_parameters=('self', 'cls', 'device')):
+def _get_arguments(from_object: Type[object], excluded_parameters: Sequence[str] = ('self', 'cls', 'device')):
     all_parameters: dict[str, inspect.Parameter] = {}
 
     for base in from_object.__mro__:
@@ -170,11 +170,11 @@ def _get_arguments(from_object: Type[object], excluded_parameters=('self', 'cls'
 
 def _previously_known_arguments(argument_parser: ArgumentParser) -> list[str]:
     return [
-        argument.option_strings[0][2:] for argument in argument_parser._actions if isinstance(argument, _StoreAction)
+        argument.option_strings[0][2:] for argument in argument_parser._actions
     ]
 
 
-def is_optional(annotation):
+def is_optional(annotation: Any) -> bool:
     if not typing.get_origin(annotation) in (Union, UnionType):
         return False
 
