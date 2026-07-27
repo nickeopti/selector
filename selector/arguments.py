@@ -1,3 +1,4 @@
+import enum
 import inspect
 import typing
 import warnings
@@ -13,10 +14,6 @@ from selector.postprocessors import postprocessor
 T = TypeVar('T')
 
 
-def _resolve_parser(parser: ArgumentParser | None) -> ArgumentParser:
-    return parser or default_parser.get()
-
-
 def get_argument(
     name: str,
     type: Type[T],
@@ -27,11 +24,29 @@ def get_argument(
 ) -> T:
     argument_parser = _resolve_parser(parser)
 
+    type_info = _unpack_type(type)
+    match type_info:
+        case Unsupported.TYPE_HINT_IS_ANY:
+            raise ValueError(f'Type hint for {name!r} is Any which is unsupported')
+        case Unsupported.TYPE_HINT_MISSING:
+            raise ValueError(f'Type hint for {name!r} seems to be missing')
+        case Unsupported.TYPE_HINT_MISSING_ITEM_TYPE:
+            raise ValueError(f'Type hint for {name!r} missing type hint for collection items')
+        case Unsupported.MULTIPLE_TYPES:
+            raise ValueError(f'Type hint for {name!r} is multiple types which is unsupported, got {type!r}')
+        case _:
+            type, is_append_container, argument_postprocessor = type_info
+
     if name not in _previously_known_arguments(argument_parser):
-        argument_parser.add_argument(f'--{name}', type=converter.get(type), default=default)
+        argument_parser.add_argument(
+            f'--{name}',
+            type=converter.get(type),
+            default=default,
+            action='append' if is_append_container else 'store',
+        )
 
     parsed_args, _ = argument_parser.parse_known_args(args)
-    return getattr(parsed_args, name)
+    return argument_postprocessor(getattr(parsed_args, name))
 
 
 def add_arguments(
@@ -62,24 +77,24 @@ def add_arguments(
                 warnings.warn(f'Type hint for {argument.name!r} is not supported by selector, got {type_hint!r}, skipping')
                 continue
 
-        if is_optional(type_hint):
-            types = typing.get_args(type_hint)
-            i = types.index(None.__class__)
-            type_hint = types[(i + 1) % 2]
-
-        if type_hint is inspect.Parameter.empty:
-            warnings.warn(f'Type hint for {argument.name!r} seems to be missing, skipping')
-            continue
-
-        origin = typing.get_origin(type_hint)
-        is_append_container = origin in (list, tuple, set)
-        if is_append_container:
-            item_types = typing.get_args(type_hint)
-            if not item_types or item_types[0] is inspect.Parameter.empty:
+        type_info = _unpack_type(type_hint)
+        match type_info:
+            case Unsupported.TYPE_HINT_IS_ANY:
+                warnings.warn(f'Type hint for {argument.name!r} is Any which is unsupported, skipping')
+                continue
+            case Unsupported.TYPE_HINT_MISSING:
+                warnings.warn(f'Type hint for {argument.name!r} seems to be missing, skipping')
+                continue
+            case Unsupported.TYPE_HINT_MISSING_ITEM_TYPE:
                 warnings.warn(f'Type hint for {argument.name!r} missing type hint for collection items, skipping')
                 continue
-            type_hint = item_types[0]
-        argument_postprocessors[argument.name] = postprocessor.get(origin)
+            case Unsupported.MULTIPLE_TYPES:
+                warnings.warn(f'Type hint for {argument.name!r} is multiple types which is unsupported, got {type_hint!r}, skipping')
+                continue
+            case _:
+                type_hint, is_append_container, argument_postprocessor = type_info
+
+        argument_postprocessors[argument.name] = argument_postprocessor
 
         if argument.name in previously_known_arguments:
             continue
@@ -182,7 +197,46 @@ def _previously_known_arguments(argument_parser: ArgumentParser) -> list[str]:
     ]
 
 
-def is_optional(annotation: Any) -> bool:
+class Unsupported(enum.Enum):
+    TYPE_HINT_IS_ANY = enum.auto()
+    TYPE_HINT_MISSING = enum.auto()
+    TYPE_HINT_MISSING_ITEM_TYPE = enum.auto()
+    MULTIPLE_TYPES = enum.auto()
+
+
+def _unpack_type(type: Type[T]) -> tuple[Type[T], bool, Callable[[Any], Any]] | Unsupported:
+    if _is_optional(type):
+        types = typing.get_args(type)
+        i = types.index(None.__class__)
+        type = types[(i + 1) % 2]
+
+    origin = typing.get_origin(type)
+
+    if origin in (Union, UnionType):
+        return Unsupported.MULTIPLE_TYPES
+
+    if type is inspect.Parameter.empty:
+        return Unsupported.TYPE_HINT_MISSING
+
+    # Not really a type, but worth guarding against
+    if type is Any:  # type: ignore
+        return Unsupported.TYPE_HINT_IS_ANY
+
+    if origin is None and type in (list, tuple, set):
+        return Unsupported.TYPE_HINT_MISSING_ITEM_TYPE
+
+    is_append_container = origin in (list, tuple, set)
+    if is_append_container:
+        item_types = typing.get_args(type)
+        if not item_types or item_types[0] in (Any, inspect.Parameter.empty):
+            return Unsupported.TYPE_HINT_MISSING_ITEM_TYPE
+        type = item_types[0]
+    argument_postprocessor = postprocessor.get(origin if origin is not None else type)
+
+    return type, is_append_container, argument_postprocessor
+
+
+def _is_optional(annotation: Any) -> bool:
     if not typing.get_origin(annotation) in (Union, UnionType):
         return False
 
@@ -192,3 +246,7 @@ def is_optional(annotation: Any) -> bool:
         return False
 
     return len(types) == 2
+
+
+def _resolve_parser(parser: ArgumentParser | None) -> ArgumentParser:
+    return parser or default_parser.get()
