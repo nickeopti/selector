@@ -18,6 +18,7 @@ def get_argument(
     name: str,
     type: Type[T],
     default: T | None = None,
+    choices: Sequence[T] | None = None,
     *,
     parser: ArgumentParser | None = None,
     args: Sequence[str] | None = None,
@@ -42,6 +43,7 @@ def get_argument(
             f'--{name}',
             type=converter.get(type),
             default=default,
+            choices=choices,
             action='append' if is_append_container else 'store',
         )
 
