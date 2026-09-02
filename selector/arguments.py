@@ -4,10 +4,10 @@ import enum
 import inspect
 import typing
 import warnings
-from argparse import ArgumentParser
+from argparse import ArgumentParser, SUPPRESS
 from functools import partial
 from types import ModuleType, UnionType
-from typing import TYPE_CHECKING, Any, Callable, Literal, Sequence, Type, TypeAlias, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, final, Literal, Sequence, Type, TypeAlias, TypeVar, Union
 
 if TYPE_CHECKING:
     from typing_extensions import TypeForm
@@ -19,10 +19,19 @@ from selector.postprocessors import postprocessor
 T = TypeVar('T')
 
 
+@final
+class Unset:
+    def __repr__(self) -> str:
+        return 'UNSET'
+
+
+UNSET = Unset()
+
+
 def get_argument(
     name: str,
     type: TypeForm[T],
-    default: T | None = None,
+    default: T | Unset = UNSET,
     choices: Sequence[T] | None = None,
     *,
     parser: ArgumentParser | None = None,
@@ -47,13 +56,20 @@ def get_argument(
         argument_parser.add_argument(
             f'--{name}',
             type=converter.get(resolved_type),
-            default=default,
+            default=default if default is not UNSET else None if _is_optional(type) else SUPPRESS,
             choices=choices or literal_choices,
             action='append' if is_append_container else 'store',
+            required=default is UNSET and not (_is_optional(type) or is_append_container),
         )
 
     parsed_args, _ = argument_parser.parse_known_args(args)
-    return argument_postprocessor(getattr(parsed_args, name))
+    if _is_optional(type) and (value := getattr(parsed_args, name)) is None:
+        return value
+    if is_append_container and name not in parsed_args:
+        value = []
+    else:
+        value = getattr(parsed_args, name)
+    return argument_postprocessor(value)
 
 
 def add_arguments(
