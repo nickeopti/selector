@@ -31,3 +31,4 @@ quote-style = "single"
 
 [tool.pyright]
 typeCheckingMode = "strict"
+enableExperimentalFeatures = true
