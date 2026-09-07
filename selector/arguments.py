@@ -5,7 +5,8 @@ import enum
 import inspect
 import typing
 import warnings
-from argparse import ArgumentParser, SUPPRESS
+from argparse import _ArgumentGroup  # type: ignore
+from argparse import ArgumentParser, Namespace, SUPPRESS
 from functools import partial
 from types import ModuleType, UnionType
 from typing import TYPE_CHECKING, Any, Callable, final, Literal, Sequence, Type, TypeVar, Union
@@ -44,24 +45,13 @@ def get_argument(
     if isinstance(type_info, Unsupported):
         raise ValueError(type_info.message(name, type))
 
+    _check_default_value(name, type, type_info, default)
+
     if name not in _previously_known_arguments(argument_parser):
-        argument_parser.add_argument(
-            f'--{name}',
-            type=converter.get(type_info.type),
-            default=default if default is not UNSET else None if type_info.is_optional else SUPPRESS,
-            choices=choices or type_info.literal_values,
-            action='append' if type_info.is_append_container else 'store',
-            required=default is UNSET and not (type_info.is_optional or type_info.is_append_container),
-        )
+        _add_parser_argument(argument_parser, name, type_info, default=default, choices=choices)
 
     parsed_args, _ = argument_parser.parse_known_args(args)
-    if type_info.is_optional and (value := getattr(parsed_args, name)) is None:
-        return value
-    if type_info.is_append_container and name not in parsed_args:
-        value = []
-    else:
-        value = getattr(parsed_args, name)
-    return type_info.postprocessor(value)
+    return _handle_parsed_value(name, type_info, parsed_args)
 
 
 def add_arguments(
@@ -71,12 +61,10 @@ def add_arguments(
     parser: ArgumentParser | None = None,
     args: Sequence[str] | None = None,
 ) -> partial[T]:
-    # TODO: Arguments not specified should be excluded, not set to None
-
     argument_parser = _resolve_parser(parser)
     argument_group = argument_parser.add_argument_group(name)
 
-    argument_postprocessors: dict[str, Callable[[Any], Any]] = {}
+    type_infos: dict[str, UnpackedTypeInfo[Any]] = {}
 
     previously_known_arguments = _previously_known_arguments(argument_parser)
     arguments = (
@@ -99,23 +87,19 @@ def add_arguments(
             warnings.warn(f'{type_info.message(argument.name, type_hint)}, skipping')
             continue
 
-        argument_postprocessors[argument.name] = type_info.postprocessor
+        type_infos[argument.name] = type_info
 
         if argument.name in previously_known_arguments:
             continue
 
-        argument_group.add_argument(
-            f'--{argument.name}',
-            type=converter.get(type_info.type),
-            action='append' if type_info.is_append_container else 'store',
-            choices=type_info.literal_values,
-        )
+        default = argument.default if argument.default is not inspect.Parameter.empty else UNSET
+
+        _add_parser_argument(argument_group, argument.name, type_info, default=default)
 
     temp_args, _ = argument_parser.parse_known_args(args)
     argument_values = {
-        argument.name: argument_postprocessors[argument.name](vars(temp_args)[argument.name])
-        for argument in arguments
-        if argument.name in vars(temp_args) and vars(temp_args)[argument.name] is not None
+        name: _handle_parsed_value(name, type_info, temp_args)
+        for name, type_info in type_infos.items()
     }
 
     return partial(reference, **argument_values)
@@ -279,6 +263,52 @@ def _unpack_type(type_hint: TypeForm[T]) -> UnpackedTypeInfo[T] | Unsupported:
         literal_values=literal_values,
         postprocessor=argument_postprocessor,
     )
+
+
+def _check_default_value(name: str, type: TypeForm[T], type_info: UnpackedTypeInfo[T], default: Any) -> None:
+    if default is UNSET:
+        return
+
+    if type_info.literal_values is not None:
+        if default not in type_info.literal_values:
+            raise ValueError(f'Default value for {name!r} is not in {type_info.literal_values}')
+
+    if type_info.is_append_container:
+        raise ValueError(f'Default value for container type argument {name!r} not supported')
+
+    if not isinstance(default, type_info.type):
+        raise ValueError(f'Default value for {name!r} is not of type {type_info.type.__name__}')
+
+
+def _default_value(type_info: UnpackedTypeInfo[T], default: Any) -> Any:
+    if default is not UNSET:
+        return default
+    if type_info.is_optional:
+        return None
+    if type_info.is_append_container:
+        return []
+    return SUPPRESS
+
+
+def _add_parser_argument(parser: ArgumentParser | _ArgumentGroup, name: str, type_info: UnpackedTypeInfo[T], *, default: Any = UNSET, choices: Sequence[T] | None = None) -> None:
+    parser.add_argument(
+        f'--{name}',
+        type=converter.get(type_info.type),
+        default=_default_value(type_info, default),
+        choices=choices or type_info.literal_values,
+        action='append' if type_info.is_append_container else 'store',
+        required=default is UNSET and not (type_info.is_optional or type_info.is_append_container),
+    )
+
+
+def _handle_parsed_value(name: str, type_info: UnpackedTypeInfo[T], parsed_args: Namespace) -> T:
+    if type_info.is_optional and (value := getattr(parsed_args, name)) is None:
+        return value
+    if type_info.is_append_container and name not in parsed_args:
+        value = []
+    else:
+        value = getattr(parsed_args, name)
+    return type_info.postprocessor(value)
 
 
 def _is_optional(annotation: Any) -> bool:
