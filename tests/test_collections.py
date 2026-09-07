@@ -50,3 +50,42 @@ def test_set_argument_add_arguments():
 
     assert isinstance(v, set)
     assert v == {1, 2, 3}
+
+
+def test_empty_list_argument_get_argument():
+    v = selector.get_argument('xs', list[int], args=())
+    assert v == []
+
+
+def test_empty_list_argument_add_arguments():
+    def f(xs: list[int]):
+        return xs
+
+    v = selector.add_arguments('f', f, args=())()
+    assert v == []
+
+
+def test_empty_tuple_argument_get_argument():
+    v = selector.get_argument('xs', tuple[int, ...], args=())
+    assert v == ()
+
+
+def test_empty_tuple_argument_add_arguments():
+    def f(xs: tuple[int, ...]):
+        return xs
+
+    v = selector.add_arguments('f', f, args=())()
+    assert v == ()
+
+
+def test_empty_set_argument_get_argument():
+    v = selector.get_argument('xs', set[int], args=())
+    assert v == set()
+
+
+def test_empty_set_argument_add_arguments():
+    def f(xs: set[int]):
+        return xs
+
+    v = selector.add_arguments('f', f, args=())()
+    assert v == set()
