@@ -3,7 +3,12 @@ from typing import Optional
 import selector
 
 
-def test_args():
+def test_args_get_argument():
+    v = selector.get_argument('value', int, args=('--value', '1'))
+    assert v == 1
+
+
+def test_args_add_arguments():
     def f(value: int):
         return value
 
@@ -12,7 +17,15 @@ def test_args():
     assert g() == 1
 
 
-def test_optional_args():
+def test_optional_args_get_argument():
+    v = selector.get_argument('value', int | None, args=('--value', '1'))
+    assert v == 1
+
+    v = selector.get_argument('value', int | None, args=())
+    assert v is None
+
+
+def test_optional_args_add_arguments():
     def f(value: int | None = None):
         return value
 
@@ -20,12 +33,12 @@ def test_optional_args():
 
     assert g() == 1
 
-    h = selector.add_arguments('f', f)
+    h = selector.add_arguments('f', f, args=())
 
     assert h() is None
 
 
-def test_optional_args_old_style():
+def test_optional_args_old_style_add_arguments():
     def f(value: Optional[int] = None):
         return value
 
@@ -33,6 +46,17 @@ def test_optional_args_old_style():
 
     assert g() == 1
 
-    h = selector.add_arguments('f', f)
+    h = selector.add_arguments('f', f, args=())
 
     assert h() is None
+
+
+def test_optional_container_get_argument():
+    v = selector.get_argument('value', list[int] | None, args=('--value', '1', '--value', '2'))
+    assert v == [1, 2]
+
+    v = selector.get_argument('value', list[int] | None, args=('--value', '1'))
+    assert v == [1]
+
+    v = selector.get_argument('value', list[int] | None, args=())
+    assert v is None
