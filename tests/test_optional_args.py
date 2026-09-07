@@ -60,3 +60,17 @@ def test_optional_container_get_argument():
 
     v = selector.get_argument('value', list[int] | None, args=())
     assert v is None
+
+
+def test_optional_container_add_arguments():
+    def f(value: list[int] | None = None):
+        return value
+
+    g = selector.add_arguments('f', f, args=('--value', '1', '--value', '2'))
+    assert g() == [1, 2]
+
+    h = selector.add_arguments('f', f, args=('--value', '1'))
+    assert h() == [1]
+    
+    i = selector.add_arguments('f', f, args=())
+    assert i() is None
