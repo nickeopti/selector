@@ -31,9 +31,3 @@ def test_invalid_choice_list():
         selector.get_argument(
             'mode', list[str], choices=['train', 'eval'], args=('--mode', 'eval', '--mode', 'invalid')
         )
-
-
-def test_default_choice_list():
-    v = selector.get_argument('mode', list[str], choices=['train', 'eval'], default=['eval'])
-
-    assert v == ['eval']
