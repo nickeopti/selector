@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import enum
 import inspect
 import typing
@@ -7,7 +8,7 @@ import warnings
 from argparse import ArgumentParser, SUPPRESS
 from functools import partial
 from types import ModuleType, UnionType
-from typing import TYPE_CHECKING, Any, Callable, final, Literal, Sequence, Type, TypeAlias, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, final, Literal, Sequence, Type, TypeVar, Union
 
 if TYPE_CHECKING:
     from typing_extensions import TypeForm
@@ -49,27 +50,27 @@ def get_argument(
             raise ValueError(f'Type hint for {name!r} missing type hint for collection items')
         case Unsupported.MULTIPLE_TYPES:
             raise ValueError(f'Type hint for {name!r} is multiple types which is unsupported, got {type!r}')
-        case _:
-            resolved_type, is_append_container, argument_postprocessor, literal_choices = type_info
+        case UnpackedTypeInfo():
+            pass
 
     if name not in _previously_known_arguments(argument_parser):
         argument_parser.add_argument(
             f'--{name}',
-            type=converter.get(resolved_type),
-            default=default if default is not UNSET else None if _is_optional(type) else SUPPRESS,
-            choices=choices or literal_choices,
-            action='append' if is_append_container else 'store',
-            required=default is UNSET and not (_is_optional(type) or is_append_container),
+            type=converter.get(type_info.type),
+            default=default if default is not UNSET else None if type_info.is_optional else SUPPRESS,
+            choices=choices or type_info.literal_values,
+            action='append' if type_info.is_append_container else 'store',
+            required=default is UNSET and not (type_info.is_optional or type_info.is_append_container),
         )
 
     parsed_args, _ = argument_parser.parse_known_args(args)
-    if _is_optional(type) and (value := getattr(parsed_args, name)) is None:
+    if type_info.is_optional and (value := getattr(parsed_args, name)) is None:
         return value
-    if is_append_container and name not in parsed_args:
+    if type_info.is_append_container and name not in parsed_args:
         value = []
     else:
         value = getattr(parsed_args, name)
-    return argument_postprocessor(value)
+    return type_info.postprocessor(value)
 
 
 def add_arguments(
@@ -118,19 +119,19 @@ def add_arguments(
                     f'Type hint for {argument.name!r} is multiple types which is unsupported, got {type_hint!r}, skipping'
                 )
                 continue
-            case _:
-                type_hint, is_append_container, argument_postprocessor, literal_choices = type_info
+            case UnpackedTypeInfo():
+                pass
 
-        argument_postprocessors[argument.name] = argument_postprocessor
+        argument_postprocessors[argument.name] = type_info.postprocessor
 
         if argument.name in previously_known_arguments:
             continue
 
         argument_group.add_argument(
             f'--{argument.name}',
-            type=converter.get(type_hint),
-            action='append' if is_append_container else 'store',
-            choices=literal_choices,
+            type=converter.get(type_info.type),
+            action='append' if type_info.is_append_container else 'store',
+            choices=type_info.literal_values,
         )
 
     temp_args, _ = argument_parser.parse_known_args(args)
@@ -225,12 +226,13 @@ def _previously_known_arguments(argument_parser: ArgumentParser) -> list[str]:
     return [argument.option_strings[0][2:] for argument in argument_parser._actions]
 
 
-UnpackedTypeInfo: TypeAlias = tuple[
-    type[Any],
-    bool,
-    Callable[[Any], Any],
-    tuple[Any, ...] | None,
-]
+@dataclasses.dataclass(frozen=True)
+class UnpackedTypeInfo[T]:
+    type: type[T]
+    is_optional: bool
+    is_append_container: bool
+    literal_values: tuple[T, ...] | None
+    postprocessor: Callable[[Any], T]
 
 
 class Unsupported(enum.Enum):
@@ -240,10 +242,11 @@ class Unsupported(enum.Enum):
     MULTIPLE_TYPES = enum.auto()
 
 
-def _unpack_type(type_hint: TypeForm[T]) -> UnpackedTypeInfo | Unsupported:
+def _unpack_type(type_hint: TypeForm[T]) -> UnpackedTypeInfo[T] | Unsupported:
     hint: Any = type_hint
 
-    if _is_optional(hint):
+    is_optional = _is_optional(hint)
+    if is_optional:
         types = typing.get_args(hint)
         i = types.index(None.__class__)
         hint = types[(i + 1) % 2]
@@ -281,7 +284,13 @@ def _unpack_type(type_hint: TypeForm[T]) -> UnpackedTypeInfo | Unsupported:
 
     argument_postprocessor = postprocessor.get(origin if origin is not None else hint)
 
-    return hint, is_append_container, argument_postprocessor, literal_values
+    return UnpackedTypeInfo(
+        type=hint,
+        is_optional=is_optional,
+        is_append_container=is_append_container,
+        literal_values=literal_values,
+        postprocessor=argument_postprocessor,
+    )
 
 
 def _is_optional(annotation: Any) -> bool:
