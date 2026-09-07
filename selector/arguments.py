@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Callable, final, Literal, Sequence, Type,
 if TYPE_CHECKING:
     from typing_extensions import TypeForm
 
+from selector.containers import containers
 from selector.converters import converter
 from selector.parser import parser as default_parser
 from selector.postprocessors import postprocessor
@@ -235,7 +236,7 @@ def _unpack_type(type_hint: TypeForm[T]) -> UnpackedTypeInfo[T] | Unsupported:
     if hint is Any:
         return Unsupported.TYPE_HINT_IS_ANY
 
-    if origin is None and hint in (list, tuple, set):
+    if origin is None and hint in containers.containers:
         return Unsupported.TYPE_HINT_MISSING_ITEM_TYPE
 
     if origin is Literal:
@@ -247,7 +248,7 @@ def _unpack_type(type_hint: TypeForm[T]) -> UnpackedTypeInfo[T] | Unsupported:
     else:
         literal_values = None
 
-    is_append_container = origin in (list, tuple, set)
+    is_append_container = origin in containers.containers
     if is_append_container:
         item_types = typing.get_args(hint)
         if not item_types or item_types[0] in (Any, inspect.Parameter.empty):

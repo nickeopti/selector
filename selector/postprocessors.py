@@ -15,7 +15,3 @@ class Postprocessor:
 
 
 postprocessor = Postprocessor()
-
-postprocessor.add(list, list)
-postprocessor.add(tuple, tuple)
-postprocessor.add(set, set)
