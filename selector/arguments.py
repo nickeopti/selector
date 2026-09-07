@@ -41,17 +41,8 @@ def get_argument(
     argument_parser = _resolve_parser(parser)
 
     type_info = _unpack_type(type)
-    match type_info:
-        case Unsupported.TYPE_HINT_IS_ANY:
-            raise ValueError(f'Type hint for {name!r} is Any which is unsupported')
-        case Unsupported.TYPE_HINT_MISSING:
-            raise ValueError(f'Type hint for {name!r} seems to be missing')
-        case Unsupported.TYPE_HINT_MISSING_ITEM_TYPE:
-            raise ValueError(f'Type hint for {name!r} missing type hint for collection items')
-        case Unsupported.MULTIPLE_TYPES:
-            raise ValueError(f'Type hint for {name!r} is multiple types which is unsupported, got {type!r}')
-        case UnpackedTypeInfo():
-            pass
+    if isinstance(type_info, Unsupported):
+        raise ValueError(type_info.message(name, type))
 
     if name not in _previously_known_arguments(argument_parser):
         argument_parser.add_argument(
@@ -104,23 +95,9 @@ def add_arguments(
                 continue
 
         type_info = _unpack_type(type_hint)
-        match type_info:
-            case Unsupported.TYPE_HINT_IS_ANY:
-                warnings.warn(f'Type hint for {argument.name!r} is Any which is unsupported, skipping')
-                continue
-            case Unsupported.TYPE_HINT_MISSING:
-                warnings.warn(f'Type hint for {argument.name!r} seems to be missing, skipping')
-                continue
-            case Unsupported.TYPE_HINT_MISSING_ITEM_TYPE:
-                warnings.warn(f'Type hint for {argument.name!r} missing type hint for collection items, skipping')
-                continue
-            case Unsupported.MULTIPLE_TYPES:
-                warnings.warn(
-                    f'Type hint for {argument.name!r} is multiple types which is unsupported, got {type_hint!r}, skipping'
-                )
-                continue
-            case UnpackedTypeInfo():
-                pass
+        if isinstance(type_info, Unsupported):
+            warnings.warn(f'{type_info.message(argument.name, type_hint)}, skipping')
+            continue
 
         argument_postprocessors[argument.name] = type_info.postprocessor
 
@@ -240,6 +217,17 @@ class Unsupported(enum.Enum):
     TYPE_HINT_MISSING = enum.auto()
     TYPE_HINT_MISSING_ITEM_TYPE = enum.auto()
     MULTIPLE_TYPES = enum.auto()
+
+    def message(self, name: str, type: TypeForm[Any]) -> str:
+        match self:
+            case Unsupported.TYPE_HINT_IS_ANY:
+                return f'Type hint for {name!r} is Any which is unsupported'
+            case Unsupported.TYPE_HINT_MISSING:
+                return f'Type hint for {name!r} seems to be missing'
+            case Unsupported.TYPE_HINT_MISSING_ITEM_TYPE:
+                return f'Type hint for {name!r} missing type hint for collection items'
+            case Unsupported.MULTIPLE_TYPES:
+                return f'Type hint for {name!r} is multiple types which is unsupported, got {type!r}'
 
 
 def _unpack_type(type_hint: TypeForm[T]) -> UnpackedTypeInfo[T] | Unsupported:
