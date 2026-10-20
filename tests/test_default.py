@@ -75,6 +75,6 @@ def test_invalid_default_get_argument():
 
     with pytest.raises(ValueError):
         selector.get_argument('value', int, default=None)
-    
+
     with pytest.raises(ValueError):
         selector.get_argument('value', Literal[1, 2, 3], default=4)

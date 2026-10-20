@@ -16,7 +16,7 @@ def test_any_type_hint():
 def test_missing_type_hint():
     def f(x):  # type: ignore
         return x  # type: ignore
-    
+
     with pytest.warns(UserWarning, match='seems to be missing'):
         selector.add_arguments('f', f)  # type: ignore
 
@@ -24,7 +24,7 @@ def test_missing_type_hint():
 def test_missing_item_type_hint():
     def f(x: list[Any]):  # type: ignore
         return x  # type: ignore
-    
+
     with pytest.warns(UserWarning, match='missing type hint for collection items'):
         selector.add_arguments('f', f)  # type: ignore
 

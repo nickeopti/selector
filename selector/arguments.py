@@ -5,11 +5,15 @@ import enum
 import inspect
 import typing
 import warnings
-from argparse import _ArgumentGroup  # type: ignore
-from argparse import ArgumentParser, Namespace, SUPPRESS
+from argparse import (
+    SUPPRESS,
+    ArgumentParser,
+    Namespace,
+    _ArgumentGroup,  # type: ignore
+)
 from functools import partial
 from types import ModuleType, UnionType
-from typing import TYPE_CHECKING, Any, Callable, final, Literal, Sequence, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Sequence, Type, TypeVar, Union, final
 
 if TYPE_CHECKING:
     from typing_extensions import TypeForm
@@ -46,7 +50,7 @@ def get_argument(
     if isinstance(type_info, Unsupported):
         raise ValueError(type_info.message(name, type))
 
-    _check_default_value(name, type, type_info, default)
+    _check_default_value(name, type_info, default)
 
     if name not in _previously_known_arguments(argument_parser):
         _add_parser_argument(argument_parser, name, type_info, default=default, choices=choices)
@@ -98,10 +102,7 @@ def add_arguments(
         _add_parser_argument(argument_group, argument.name, type_info, default=default)
 
     temp_args, _ = argument_parser.parse_known_args(args)
-    argument_values = {
-        name: _handle_parsed_value(name, type_info, temp_args)
-        for name, type_info in type_infos.items()
-    }
+    argument_values = {name: _handle_parsed_value(name, type_info, temp_args) for name, type_info in type_infos.items()}
 
     return partial(reference, **argument_values)
 
@@ -189,7 +190,7 @@ def _previously_known_arguments(argument_parser: ArgumentParser) -> list[str]:
 
 
 @dataclasses.dataclass(frozen=True)
-class UnpackedTypeInfo[T]:
+class UnpackedTypeInfo(Generic[T]):
     type: type[T]
     is_optional: bool
     is_append_container: bool
@@ -270,7 +271,7 @@ def _unpack_type(type_hint: TypeForm[T]) -> UnpackedTypeInfo[T] | Unsupported:
 _PROMOTIONS = {float: (int,), complex: (int, float)}
 
 
-def _check_default_value(name: str, type: TypeForm[T], type_info: UnpackedTypeInfo[T], default: Any) -> None:
+def _check_default_value(name: str, type_info: UnpackedTypeInfo[T], default: Any) -> None:
     if default is UNSET:
         return
 
@@ -303,7 +304,14 @@ def _default_value(type_info: UnpackedTypeInfo[T], default: Any) -> Any:
     return SUPPRESS
 
 
-def _add_parser_argument(parser: ArgumentParser | _ArgumentGroup, name: str, type_info: UnpackedTypeInfo[T], *, default: Any = UNSET, choices: Sequence[T] | None = None) -> None:
+def _add_parser_argument(
+    parser: ArgumentParser | _ArgumentGroup,
+    name: str,
+    type_info: UnpackedTypeInfo[T],
+    *,
+    default: Any = UNSET,
+    choices: Sequence[T] | None = None,
+) -> None:
     parser.add_argument(
         f'--{name}',
         type=converter.get(type_info.type),
@@ -316,7 +324,7 @@ def _add_parser_argument(parser: ArgumentParser | _ArgumentGroup, name: str, typ
 
 def _handle_parsed_value(name: str, type_info: UnpackedTypeInfo[T], parsed_args: Namespace) -> T:
     if type_info.is_optional and (value := getattr(parsed_args, name)) is None:
-        return value
+        return typing.cast(T, value)
     if type_info.is_append_container and name not in parsed_args:
         value = []
     else:
@@ -325,7 +333,7 @@ def _handle_parsed_value(name: str, type_info: UnpackedTypeInfo[T], parsed_args:
 
 
 def _is_optional(annotation: Any) -> bool:
-    if not typing.get_origin(annotation) in (Union, UnionType):
+    if typing.get_origin(annotation) not in (Union, UnionType):
         return False
 
     types = typing.get_args(annotation)
