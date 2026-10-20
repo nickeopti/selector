@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "selector"
 version = "0.6.2"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
 ]
 
