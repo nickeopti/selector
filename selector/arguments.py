@@ -266,6 +266,10 @@ def _unpack_type(type_hint: TypeForm[T]) -> UnpackedTypeInfo[T] | Unsupported:
     )
 
 
+# Adhere to the numeric tower principle https://peps.python.org/pep-0484/#the-numeric-tower
+_PROMOTIONS = {float: (int,), complex: (int, float)}
+
+
 def _check_default_value(name: str, type: TypeForm[T], type_info: UnpackedTypeInfo[T], default: Any) -> None:
     if default is UNSET:
         return
@@ -280,12 +284,17 @@ def _check_default_value(name: str, type: TypeForm[T], type_info: UnpackedTypeIn
     if type_info.is_append_container:
         raise ValueError(f'Default value for container type argument {name!r} not supported')
 
+    if type_info.type in _PROMOTIONS and isinstance(default, _PROMOTIONS[type_info.type]):
+        return
+
     if not isinstance(default, type_info.type):
         raise ValueError(f'Default value for {name!r} is not of type {type_info.type.__name__}')
 
 
 def _default_value(type_info: UnpackedTypeInfo[T], default: Any) -> Any:
     if default is not UNSET:
+        if type_info.type in _PROMOTIONS and isinstance(default, _PROMOTIONS[type_info.type]):
+            return type_info.type(default)
         return default
     if type_info.is_optional:
         return None
