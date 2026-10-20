@@ -176,10 +176,11 @@ def _get_arguments(
     all_parameters: dict[str, inspect.Parameter] = {}
 
     for base in from_object.__mro__:
-        parameters = _get_function_arguments(base.__init__)  # type: ignore
+        init: Callable[..., Any] = getattr(base, '__init__')
+        parameters = _get_function_arguments(init)
         all_parameters = parameters | all_parameters  # Let subclass parameters take precedence
 
-        if not _takes_kwargs(base.__init__):
+        if not _takes_kwargs(init):
             break
 
     return [parameter for parameter in all_parameters.values() if parameter.name not in excluded_parameters]
@@ -295,7 +296,8 @@ def _check_default_value(name: str, type_info: UnpackedTypeInfo[T], default: Any
 def _default_value(type_info: UnpackedTypeInfo[T], default: Any) -> Any:
     if default is not UNSET:
         if type_info.type in _PROMOTIONS and isinstance(default, _PROMOTIONS[type_info.type]):
-            return type_info.type(default)
+            promote = typing.cast(Callable[[Any], T], type_info.type)
+            return promote(default)
         return default
     if type_info.is_optional:
         return None
