@@ -38,6 +38,14 @@ def test_optional_args_add_arguments():
     assert h() is None
 
 
+def test_optional_args_with_default_get_argument():
+    v = selector.get_argument('value', int | None, default=None, args=('--value', '1'))
+    assert v == 1
+
+    v = selector.get_argument('value', int | None, default=None, args=())
+    assert v is None
+
+
 def test_optional_args_old_style_add_arguments():
     def f(value: Optional[int] = None):
         return value
@@ -71,6 +79,6 @@ def test_optional_container_add_arguments():
 
     h = selector.add_arguments('f', f, args=('--value', '1'))
     assert h() == [1]
-    
+
     i = selector.add_arguments('f', f, args=())
     assert i() is None

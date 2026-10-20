@@ -270,6 +270,9 @@ def _check_default_value(name: str, type: TypeForm[T], type_info: UnpackedTypeIn
     if default is UNSET:
         return
 
+    if default is None and type_info.is_optional:
+        return
+
     if type_info.literal_values is not None:
         if default not in type_info.literal_values:
             raise ValueError(f'Default value for {name!r} is not in {type_info.literal_values}')
